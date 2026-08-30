@@ -17,10 +17,21 @@ import {
 import { Ascii } from './ascii.js';
 import { Particles } from './particles.js';
 import { Manifesto } from './manifesto.js';
+import { Mixtape } from './mixtape.js';
+import { CopyrightModel, PlayModel, PauseModel } from './model.js';
 
-// Pipeline condivisa: scena 3D -> buffer -> griglia di luminanza.
-function renderLogoFrame(app) {
+function renderLogoFrame(app, offsetX = 0) {
+  if (offsetX !== 0) {
+    app.gfx.push();
+    app.gfx.translate(offsetX, 0, 0);
+  }
+  
   app.model.render(app.gfx, app.angle);
+  
+  if (offsetX !== 0) {
+    app.gfx.pop();
+  }
+  
   app.gfx.loadPixels();
   Ascii.sampleLuminance(app.gfx, app.cols, app.rows, app.cellW, app.cellH, app.lum);
 }
@@ -33,8 +44,8 @@ function asciiOf(model) {
 
 // Disegna il frame ASCII corrente del logo (idle, align, hold).
 // Forza textSize(FONT_SIZE) per sicurezza (ShowManifesto potrebbe averlo cambiato).
-function drawLogoFrame(app) {
-  renderLogoFrame(app);
+function drawLogoFrame(app, offsetX = 0) {
+  renderLogoFrame(app, offsetX);
   background(BG_COLOR);
   fill(CHAR_COLOR);
   textSize(FONT_SIZE);
@@ -45,20 +56,32 @@ function drawLogoFrame(app) {
 // mai stantio (sopravvive a resize). Sorgente/destinazione del morph.
 // NB: sovrascrive app.lum — se ti serve il frame VIVO come sorgente, leggilo
 // (Ascii.gridToCells(app.lum, ...)) PRIMA di chiamare questa.
-function cellsAtAngle(app, model, angle) {
+function cellsAtAngle(app, model, angle, offsetX = 0) {
+  if (offsetX !== 0) {
+    app.gfx.push();
+    app.gfx.translate(offsetX, 0, 0);
+  }
+  
   model.render(app.gfx, angle);
+  
+  if (offsetX !== 0) {
+    app.gfx.pop();
+  }
+  
   app.gfx.loadPixels();
   Ascii.sampleLuminance(app.gfx, app.cols, app.rows, app.cellW, app.cellH, app.lum);
   return Ascii.gridToCells(app.lum, app.cols, app.rows, asciiOf(model));
 }
 
 // Frontale (angolo 0): il caso usato dal click-morph logo<->©.
-function frontalCells(app, model) {
-  return cellsAtAngle(app, model, 0);
+function frontalCells(app, model, offsetX = 0) {
+  return cellsAtAngle(app, model, 0, offsetX);
 }
 
 function overLogo(app, x, y) {
-  return dist(x, y, width / 2, height / 2) <= app.model.hitRadius();
+  let cx = width / 2;
+  if (app.state === ShowMixtape) cx += width / 4;
+  return dist(x, y, cx, height / 2) <= app.model.hitRadius();
 }
 
 // --- Oggetto che gira: comportamento idle condiviso da OGNI schermata.
@@ -83,6 +106,7 @@ const IdleSpin = {
 const Align = {
   enter(app, opts) {
     this.t = 0;
+    this.opts = opts || {};
     this._onAligned = opts && opts.onAligned;
     this.from = app.angle;
     this.to = Math.round(app.angle / TWO_PI) * TWO_PI;   // sempre il giro "corto"
@@ -95,7 +119,13 @@ const Align = {
       else app.setState(Hold);
     }
   },
-  draw(app) { drawLogoFrame(app); },
+  draw(app) {
+    if (this.opts && this.opts.drawOverride) {
+      this.opts.drawOverride(app, this.t);
+    } else {
+      drawLogoFrame(app);
+    }
+  },
 };
 
 // --- Beat fermo frontale, poi snapshot e via col morph ---
@@ -105,6 +135,7 @@ const Align = {
 const Hold = {
   enter(app, opts) {
     this.t = 0;
+    this.opts = opts || {};
     this._onHeld = opts && opts.onHeld;
   },
   update(app, dt) {
@@ -127,7 +158,13 @@ const Hold = {
       }
     }
   },
-  draw(app) { drawLogoFrame(app); },
+  draw(app) {
+    if (this.opts && this.opts.drawOverride) {
+      this.opts.drawOverride(app, this.t / ANIM.HOLD_DURATION);
+    } else {
+      drawLogoFrame(app);
+    }
+  },
 };
 
 // --- Morph fluido: transizione diretta sorgente → destinazione ---
@@ -138,26 +175,33 @@ const Morph = {
   enter(app, opts) {
     this.opts = opts;
     this.t = 0;
-    const sCW = opts.sourceCellW || app.cellW;
-    const sCH = opts.sourceCellH || app.cellH;
-    const tCW = opts.targetCellW || app.cellW;
-    const tCH = opts.targetCellH || app.cellH;
-    Particles.spawn(opts.source, sCW, sCH);
-    Particles.assignTargets(opts.targets, tCW, tCH);
+    this.sCW = opts.sourceCellW || app.cellW;
+    this.sCH = opts.sourceCellH || app.cellH;
+    this.tCW = opts.targetCellW || app.cellW;
+    this.tCH = opts.targetCellH || app.cellH;
+    this.u = 0;
+    Particles.spawn(opts.source, this.sCW, this.sCH);
+    Particles.assignTargets(opts.targets, this.tCW, this.tCH);
   },
   update(app, dt) {
     this.t += dt;
-    const u = min(this.t / ANIM.MORPH_DURATION, 1);
-    Particles.updateMorph(easeInOutCubic(u));
+    this.u = min(this.t / ANIM.MORPH_DURATION, 1);
+    Particles.updateMorph(easeInOutCubic(this.u));
     if (this.t >= ANIM.MORPH_DURATION) {
       if (this.opts.onDone) this.opts.onDone(app);
       app.setState(this.opts.next);
     }
   },
-  draw() {
+  draw(app) {
     background(BG_COLOR);
-    textSize(FONT_SIZE);
-    Particles.draw();
+    const currentCellH = lerp(this.sCH, this.tCH, easeInOutCubic(this.u));
+    const currentCellW = lerp(this.sCW, this.tCW, easeInOutCubic(this.u));
+    textSize(currentCellH);
+    Particles.draw(currentCellW, currentCellH);
+    
+    if (this.opts.drawOverlay) {
+      this.opts.drawOverlay(app, this.u);
+    }
   },
 };
 
@@ -201,9 +245,10 @@ const Scrub = {
     }
   },
 
-  draw() {
+  draw(app) {
     background(BG_COLOR);
-    Particles.draw();
+    textSize(FONT_SIZE);
+    Particles.draw(app.cellW, app.cellH);
   },
 };
 
@@ -248,6 +293,80 @@ const ShowManifesto = {
   getCells()  { return this._cells || []; },
   getCellW()  { return this._mCellW; },
   getCellH()  { return this._mCellH; },
+};
+
+// --- Mixtape: la playlist e il player ASCII ---
+const ShowMixtape = {
+  enter(app) {
+    app.showingMixtape = true;
+    app.model = Mixtape.isPlaying ? PauseModel : PlayModel;
+    
+    // Inverti il tasto quando la canzone finisce
+    Mixtape.onEnd(() => {
+      const offsetX = width / 4;
+      const source = frontalCells(app, app.model, offsetX);
+      const target = frontalCells(app, PlayModel, offsetX);
+      app.setState(Morph, {
+        source,
+        targets: target,
+        next: ShowMixtape,
+        onDone: a => { a.model = PlayModel; }
+      });
+    });
+  },
+
+  update(app, dt) {
+    app.angle += SPIN_SPEED * dt;
+  },
+
+  draw(app) {
+    drawLogoFrame(app, width / 4);
+    
+    Mixtape.drawTracklist(app, 255);
+  },
+
+  onClick(app, x, y) {
+    const hitTrack = Mixtape.hitTest(x, y);
+    const offsetX = width / 4;
+    
+    if (hitTrack && hitTrack.type === 'track') {
+      Mixtape.setTrack(hitTrack.index);
+      if (app.model === PlayModel) {
+        const source = cellsAtAngle(app, app.model, app.angle, offsetX);
+        const target = cellsAtAngle(app, PauseModel, app.angle, offsetX);
+        app.setState(Morph, {
+          source, targets: target, next: ShowMixtape,
+          drawOverlay: a => Mixtape.drawTracklist(a, 255),
+          onDone: a => { a.model = PauseModel; }
+        });
+      }
+    } else if (hitTrack && hitTrack.type === 'progress') {
+      Mixtape.seek(hitTrack.frac);
+    } else if (overLogo(app, x, y)) {
+      if (Mixtape.isPlaying) {
+        Mixtape.pause();
+        const source = cellsAtAngle(app, app.model, app.angle, offsetX);
+        const target = cellsAtAngle(app, PlayModel, app.angle, offsetX);
+        app.setState(Morph, {
+          source, targets: target, next: ShowMixtape,
+          drawOverlay: a => Mixtape.drawTracklist(a, 255),
+          onDone: a => { a.model = PlayModel; }
+        });
+      } else {
+        Mixtape.play();
+        const source = cellsAtAngle(app, app.model, app.angle, offsetX);
+        const target = cellsAtAngle(app, PauseModel, app.angle, offsetX);
+        app.setState(Morph, {
+          source, targets: target, next: ShowMixtape,
+          drawOverlay: a => Mixtape.drawTracklist(a, 255),
+          onDone: a => { a.model = PauseModel; }
+        });
+      }
+    } else {
+      // Clicked outside, chiudi mixtape
+      triggerMixtape(app);
+    }
+  }
 };
 
 // Toggle manifesto: gestisce il passaggio IdleSpin ↔ ShowManifesto
@@ -303,7 +422,82 @@ function triggerManifesto(app) {
   // Se siamo in Align/Hold/Morph (transizione in corso) → ignora
 }
 
+// Toggle mixtape: gestisce il passaggio IdleSpin ↔ ShowMixtape
+function triggerMixtape(app) {
+  const link = document.getElementById('mixtape-link');
+
+  if (app.state === ShowMixtape) {
+    // Esci dal mixtape: morph verso CopyrightModel al centro
+    app.setState(Align, {
+      drawOverride: a => {
+        drawLogoFrame(a, width / 4);
+        push();
+        Mixtape.drawTracklist(a, 255);
+        pop();
+      },
+      onAligned: () => {
+        app.setState(Hold, {
+          drawOverride: a => {
+            drawLogoFrame(a, width / 4);
+            push();
+            Mixtape.drawTracklist(a, 255);
+            pop();
+          },
+          onHeld: () => {
+            const offsetX = width / 4;
+            const source = frontalCells(app, app.model, offsetX);
+            const target = frontalCells(app, CopyrightModel, 0);
+            app.setState(Morph, {
+              source,
+              targets: target,
+              next: IdleSpin,
+              drawOverlay: (a, u) => {
+                push();
+                Mixtape.drawTracklist(a, (1 - u) * 255);
+                pop();
+              },
+              onDone: a => {
+                a.showingMixtape = false;
+                a.model = CopyrightModel;
+                if (link) link.classList.remove('active');
+              }
+            });
+          }
+        });
+      }
+    });
+  } else if (app.state === IdleSpin) {
+    if (link) link.classList.add('active');
+    
+    app.setState(Align, {
+      onAligned: () => {
+        app.setState(Hold, {
+          onHeld: () => {
+            const offsetX = width / 4;
+            const source = frontalCells(app, app.model, 0);
+            const targetModel = Mixtape.isPlaying ? PauseModel : PlayModel;
+            const target = frontalCells(app, targetModel, offsetX);
+            app.setState(Morph, {
+              source,
+              targets: target,
+              next: ShowMixtape,
+              drawOverlay: (a, u) => {
+                push();
+                Mixtape.drawTracklist(a, u * 255);
+                pop();
+              },
+              onDone: a => {
+                a.model = targetModel;
+              }
+            });
+          }
+        });
+      }
+    });
+  }
+}
+
 // Align/Scrub sono usati anche da main.js (click home, scroll).
-export { IdleSpin, Align, Hold, Morph, Scrub, ShowManifesto, triggerManifesto };
+export { IdleSpin, Align, Hold, Morph, Scrub, ShowManifesto, triggerManifesto, ShowMixtape, triggerMixtape };
 
 

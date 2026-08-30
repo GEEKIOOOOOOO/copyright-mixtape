@@ -61,6 +61,49 @@ const CopyrightModel = {
   },
 };
 
+const PlayModel = {
+  render(pg, angle) {
+    pg.background(0);
+    pg.noStroke();
+    applyStudioLights(pg);
+
+    pg.push();
+    pg.scale(MODEL_SIZE / 400);
+    pg.rotateY(angle);
+    
+    // Disegna un prisma a base triangolare con normali piatte (per evitare che sembri tondo)
+    // Punta verso destra
+    drawSharpTriangle(pg, 90, 10);
+    pg.pop();
+  },
+  hitRadius() { return (MODEL_SIZE / 2) * 1.15; }
+};
+
+const PauseModel = {
+  render(pg, angle) {
+    pg.background(0);
+    pg.noStroke();
+    applyStudioLights(pg);
+
+    pg.push();
+    pg.scale(MODEL_SIZE / 400);
+    pg.rotateY(angle);
+    
+    pg.push();
+    pg.translate(-25, 0, 0);
+    pg.box(25, 110, 15);
+    pg.pop();
+
+    pg.push();
+    pg.translate(25, 0, 0);
+    pg.box(25, 110, 15);
+    pg.pop();
+
+    pg.pop();
+  },
+  hitRadius() { return (MODEL_SIZE / 2) * 1.15; }
+};
+
 // Costruisce un "tubo" che segue un arco nel piano XY: è la C della ©.
 function arcTube(pg, R, r, a0, a1, arcSteps, tubeSteps) {
   for (let i = 0; i < arcSteps; i++) {
@@ -100,5 +143,53 @@ function endCap(pg, R, r, theta, tubeSteps, dir) {
   pg.endShape();
 }
 
+// Disegna un prisma triangolare con normali taglienti (non smussate)
+function drawSharpTriangle(pg, R, depth) {
+  const p1 = [R, 0];
+  const p2 = [-R/2, R * Math.sqrt(3)/2];
+  const p3 = [-R/2, -R * Math.sqrt(3)/2];
+  
+  // Faccia frontale
+  pg.beginShape(TRIANGLES);
+  pg.normal(0, 0, 1);
+  pg.vertex(p1[0], p1[1], depth);
+  pg.vertex(p2[0], p2[1], depth);
+  pg.vertex(p3[0], p3[1], depth);
+  pg.endShape();
+  
+  // Faccia posteriore
+  pg.beginShape(TRIANGLES);
+  pg.normal(0, 0, -1);
+  pg.vertex(p1[0], p1[1], -depth);
+  pg.vertex(p3[0], p3[1], -depth);
+  pg.vertex(p2[0], p2[1], -depth);
+  pg.endShape();
+  
+  // Lati
+  drawQuad(pg, p1, p2, depth);
+  drawQuad(pg, p2, p3, depth);
+  drawQuad(pg, p3, p1, depth);
+}
+
+function drawQuad(pg, a, b, depth) {
+  const dx = b[0] - a[0];
+  const dy = b[1] - a[1];
+  const len = Math.sqrt(dx*dx + dy*dy);
+  // Normale 2D perpendicolare al lato
+  const nx = dy / len;
+  const ny = -dx / len;
+  
+  pg.beginShape(TRIANGLES);
+  pg.normal(nx, ny, 0);
+  pg.vertex(a[0], a[1], depth);
+  pg.vertex(b[0], b[1], depth);
+  pg.vertex(b[0], b[1], -depth);
+  
+  pg.vertex(a[0], a[1], depth);
+  pg.vertex(b[0], b[1], -depth);
+  pg.vertex(a[0], a[1], -depth);
+  pg.endShape();
+}
+
 // applyStudioLights è usato anche da image-model.
-export { CopyrightModel, applyStudioLights };
+export { CopyrightModel, PlayModel, PauseModel, applyStudioLights };

@@ -2,9 +2,6 @@
 node_modules/
 dist/
 
-# Materiale sorgente pesante
-wetransfer_bozze_2026-07-03_0039/
-
 # OS / editor
 .DS_Store
 *.log

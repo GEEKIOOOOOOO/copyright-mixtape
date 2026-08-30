@@ -15,8 +15,9 @@
 
 import { FONT_SIZE, MODEL_CYCLE } from './config.js';
 import { CopyrightModel } from './model.js';
-import { IdleSpin, triggerManifesto } from './states.js';
+import { IdleSpin, triggerManifesto, triggerMixtape, ShowMixtape } from './states.js';
 import { Manifesto } from './manifesto.js';
+import { Mixtape } from './mixtape.js';
 
 const App = {
   state: null,
@@ -38,6 +39,7 @@ const App = {
   dwellUntil: 0,         // fino a quando lo scroll resta assorbito dopo un aggancio (detent)
 
   showingManifesto: false,  // true quando il manifesto è visibile
+  showingMixtape: false,    // true quando il mixtape è visibile
 
   setState(state, opts) {
     this.state = state;
@@ -61,6 +63,7 @@ function preload() {
 
   for (const m of App.models) if (m.preload) m.preload();
   Manifesto.preload();
+  Mixtape.preload();
 }
 
 function setup() {
@@ -83,6 +86,15 @@ function setup() {
     manifestoLink.addEventListener('click', e => {
       e.preventDefault();
       triggerManifesto(App);
+    });
+  }
+
+  // Link "mixtape" nell'header
+  const mixtapeLink = document.getElementById('mixtape-link');
+  if (mixtapeLink) {
+    mixtapeLink.addEventListener('click', e => {
+      e.preventDefault();
+      triggerMixtape(App);
     });
   }
 }
@@ -116,7 +128,21 @@ function windowResized() {
 function mousePressed() {
   if (App.showingManifesto) {
     triggerManifesto(App);
+  } else if (App.showingMixtape) {
+    if (App.state && App.state.onClick) {
+      App.state.onClick(App, mouseX, mouseY);
+    }
   }
+}
+
+function touchStarted(event) {
+  // Permetti i click sui link dell'header
+  if (event && event.target && event.target.tagName !== 'CANVAS') {
+    return;
+  }
+  mousePressed();
+  // Previene lo scrolling/zooming accidentale sul canvas da mobile
+  return false;
 }
 
 // --- Aggancio del ciclo di vita p5 (global mode) ---
@@ -133,3 +159,4 @@ window.setup         = setup;
 window.draw          = draw;
 window.windowResized = windowResized;
 window.mousePressed  = mousePressed;
+window.touchStarted  = touchStarted;

@@ -235,12 +235,13 @@ const Particles = {
 
   // Disegna con z-buffer di occupazione: un solo glifo per cella (quello con
   // alpha maggiore). L'inchiostro non si somma -> niente zone scure dense.
-  draw() {
+  draw(currentCellW, currentCellH) {
     const col = color(CHAR_COLOR);
     noStroke();
 
     // 1) Occupazione: per ogni cella tengo la particella più opaca.
-    const cellW = this.cellW, cellH = this.cellH;
+    const cellW = currentCellW || this.cellW;
+    const cellH = currentCellH || this.cellH;
     const occ = new Map();
     for (const p of this.list) {
       if (p.alpha <= 1) continue;
