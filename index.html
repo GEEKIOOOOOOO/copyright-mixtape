@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>©</title>
+  <style>
+    html, body { margin: 0; padding: 0; overflow: hidden; background: #ffffff; }
+    canvas { display: block; }
+
+    /* ---- Header overlay ---- */
+    .site-header {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 10;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 24px 32px;
+      pointer-events: none;           /* il canvas sotto resta cliccabile se serve */
+      user-select: none;
+      font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+      color: #1a1a1a;
+    }
+
+    .site-header > * {
+      pointer-events: auto;           /* i link/bottoni restano cliccabili */
+    }
+
+    /* Logo testuale a sinistra */
+    .header-logo {
+      font-size: 24px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-decoration: none;
+      color: #1a1a1a;
+    }
+
+    /* Nav + icona a destra */
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 28px;
+    }
+
+    .header-nav {
+      display: flex;
+      gap: 24px;
+      list-style: none;
+      margin: 0;
+      padding: 0;
+    }
+
+    .header-nav a {
+      font-size: 18px;
+      font-weight: 400;
+      text-decoration: none;
+      color: #1a1a1a;
+      letter-spacing: 0.04em;
+      cursor: pointer;
+      transition: opacity 0.2s ease;
+    }
+
+    .header-nav a:hover {
+      opacity: 0.5;
+    }
+
+    .header-nav a.active {
+      opacity: 0.5;
+    }
+
+    .header-ig {
+      display: flex;
+      align-items: center;
+      color: #1a1a1a;
+      transition: opacity 0.2s ease;
+    }
+
+    .header-ig:hover {
+      opacity: 0.5;
+    }
+
+    .header-ig svg {
+      width: 22px;
+      height: 22px;
+    }
+  </style>
+  <!-- p5 come libreria globale (in locale, da public/): si auto-avvia in
+       "global mode" trovando window.setup, esattamente come faceva col CDN.
+       Tenuta fuori dal bundle apposta: è vendor grande e a sé stante. -->
+  <script src="p5.min.js"></script>
+</head>
+<body>
+
+  <!-- Header sovrapposto al canvas (position:fixed, nessuno spazio verticale) -->
+  <header class="site-header">
+    <a class="header-logo" href="/">GEE©IO</a>
+
+    <div class="header-right">
+      <nav>
+        <ul class="header-nav">
+          <li><a id="manifesto-link" href="#manifesto">manifesto</a></li>
+          <li><a href="#mixtape">mixtape</a></li>
+        </ul>
+      </nav>
+
+      <a class="header-ig" href="https://instagram.com" target="_blank" rel="noopener noreferrer" aria-label="Instagram">
+        <!-- Instagram icon (SVG inline) -->
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="2" y="2" width="20" height="20" rx="5" />
+          <circle cx="12" cy="12" r="5" />
+          <circle cx="17.5" cy="6.5" r="1.2" fill="currentColor" stroke="none" />
+        </svg>
+      </a>
+    </div>
+  </header>
+
+  <!-- Codice dell'app come modulo ES: Vite risolve gli import a partire da qui.
+       L'ordine dei moduli lo gestiscono gli import (vedi src/main.js), non più
+       l'ordine dei tag <script>. Avvio: `npm run dev`. -->
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
