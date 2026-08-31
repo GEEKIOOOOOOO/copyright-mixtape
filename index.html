@@ -89,8 +89,10 @@
   </style>
   <!-- p5 come libreria globale (in locale, da public/): si auto-avvia in
        "global mode" trovando window.setup, esattamente come faceva col CDN.
-       Tenuta fuori dal bundle apposta: è vendor grande e a sé stante. -->
-  <script src="p5.min.js"></script>
+       Tenuta fuori dal bundle apposta: è vendor grande e a sé stante.
+       NOTA: usiamo "./" (relativo alla pagina) così funziona anche sotto
+       il sub-path di GitHub Pages (/copyright-mixtape/). -->
+  <script src="./p5.min.js"></script>
 </head>
 <body>
 

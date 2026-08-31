@@ -253,8 +253,8 @@ const Scrub = {
 };
 
 // --- Manifesto: il testo del manifesto fermo al centro, reso come griglia ---
-// di caratteri ASCII a MANIFESTO_FONT_SIZE. Al click ovunque (o click su
-// "manifesto" di nuovo) avvia il morph inverso verso il © e torna a IdleSpin.
+// di caratteri ASCII a MANIFESTO_FONT_SIZE. La navigazione avviene solo
+// tramite i link nell'header (manifesto/mixtape), mai click casuale.
 const ShowManifesto = {
   _cells: null,   // celle del manifesto (cache, invalidata su resize)
   _w: 0,          // dimensioni canvas al momento del calcolo (per invalidare)
@@ -362,43 +362,106 @@ const ShowMixtape = {
           onDone: a => { a.model = PauseModel; }
         });
       }
-    } else {
-      // Clicked outside, chiudi mixtape
-      triggerMixtape(app);
     }
+    // Click fuori da tracce/logo: nessuna azione (non torna alla home)
   }
 };
 
-// Toggle manifesto: gestisce il passaggio IdleSpin ↔ ShowManifesto
-// attraverso il sistema di morph particellare. Gestisce anche lo stile
-// del link nell'header (classe 'active').
-// Le dimensioni di cella per sorgente e destinazione sono passate al Morph
-// separatamente: logo a FONT_SIZE, manifesto a MANIFESTO_FONT_SIZE.
+// =============================================================
+//  Navigazione universale: triggerManifesto / triggerMixtape
+//
+//  Gestiscono le transizioni fluide tra TUTTE le combinazioni:
+//    IdleSpin  ↔  ShowManifesto
+//    IdleSpin  ↔  ShowMixtape
+//    ShowMixtape  →  ShowManifesto  (e viceversa)
+//
+//  Ogni transizione usa la pipeline  Align → Hold → Morph,
+//  con le dimensioni di cella appropriate interpolate dal Morph.
+//  Durante una transizione in corso (Align/Hold/Morph) il click
+//  viene ignorato per evitare glitch.
+// =============================================================
+
+// Aggiorna le classi 'active' sui link dell'header
+function setActiveLink(activeId) {
+  const mLink = document.getElementById('manifesto-link');
+  const xLink = document.getElementById('mixtape-link');
+  if (mLink) mLink.classList.toggle('active', activeId === 'manifesto-link');
+  if (xLink) xLink.classList.toggle('active', activeId === 'mixtape-link');
+}
+
+// --- triggerManifesto ---
+// Gestisce: ShowManifesto→Home, IdleSpin→ShowManifesto, ShowMixtape→ShowManifesto
 function triggerManifesto(app) {
-  const link = document.getElementById('manifesto-link');
   const { cellW: mCW, cellH: mCH } = Manifesto.cellSize(app.cellW);
 
   if (app.state === ShowManifesto) {
-    // --- Morph inverso: manifesto → © ---
+    // --- Manifesto → Home (morph inverso: manifesto → ©) ---
     const source = ShowManifesto.getCells();
-    const target = frontalCells(app, app.model);
+    const target = frontalCells(app, CopyrightModel);
     app.setState(Morph, {
       source,
       targets: target,
       sourceCellW: ShowManifesto.getCellW(),
       sourceCellH: ShowManifesto.getCellH(),
-      // targetCellW/H omessi → usa app.cellW/cellH (griglia logo)
       next: IdleSpin,
       onDone: a => {
         a.showingManifesto = false;
-        if (link) link.classList.remove('active');
+        a.model = CopyrightModel;
+        setActiveLink(null);
         a.angle = 0;
       },
     });
-  } else if (app.state === IdleSpin) {
-    // --- Avvia la sequenza: Align → Hold → Morph → ShowManifesto ---
+
+  } else if (app.state === ShowMixtape) {
+    // --- Mixtape → Manifesto (crossfade fluido) ---
     if (!Manifesto._ready) return;
-    if (link) link.classList.add('active');
+    const offsetX = width / 4;
+    app.setState(Align, {
+      drawOverride: a => {
+        drawLogoFrame(a, offsetX);
+        push();
+        Mixtape.drawTracklist(a, 255);
+        pop();
+      },
+      onAligned: () => {
+        app.setState(Hold, {
+          drawOverride: a => {
+            drawLogoFrame(a, offsetX);
+            push();
+            Mixtape.drawTracklist(a, 255);
+            pop();
+          },
+          onHeld: () => {
+            // Morph: logo da posizione mixtape (offset) verso celle manifesto
+            const source = frontalCells(app, app.model, offsetX);
+            const target = Manifesto.getCells(width, height, mCW, mCH);
+            app.setState(Morph, {
+              source,
+              targets: target,
+              targetCellW: mCW,
+              targetCellH: mCH,
+              next: ShowManifesto,
+              drawOverlay: (a, u) => {
+                push();
+                Mixtape.drawTracklist(a, (1 - u) * 255);
+                pop();
+              },
+              onDone: a => {
+                a.showingMixtape = false;
+                a.showingManifesto = true;
+                a.model = CopyrightModel;
+                setActiveLink('manifesto-link');
+              },
+            });
+          },
+        });
+      },
+    });
+
+  } else if (app.state === IdleSpin) {
+    // --- Home → Manifesto ---
+    if (!Manifesto._ready) return;
+    setActiveLink('manifesto-link');
     app.setState(Align, {
       onAligned: () => {
         app.setState(Hold, {
@@ -408,7 +471,6 @@ function triggerManifesto(app) {
             app.setState(Morph, {
               source,
               targets: target,
-              // sourceCellW/H omessi → usa app.cellW/cellH (griglia logo)
               targetCellW: mCW,
               targetCellH: mCH,
               next: ShowManifesto,
@@ -422,15 +484,16 @@ function triggerManifesto(app) {
   // Se siamo in Align/Hold/Morph (transizione in corso) → ignora
 }
 
-// Toggle mixtape: gestisce il passaggio IdleSpin ↔ ShowMixtape
+// --- triggerMixtape ---
+// Gestisce: ShowMixtape→Home, IdleSpin→ShowMixtape, ShowManifesto→ShowMixtape
 function triggerMixtape(app) {
-  const link = document.getElementById('mixtape-link');
 
   if (app.state === ShowMixtape) {
-    // Esci dal mixtape: morph verso CopyrightModel al centro
+    // --- Mixtape → Home ---
+    const offsetX = width / 4;
     app.setState(Align, {
       drawOverride: a => {
-        drawLogoFrame(a, width / 4);
+        drawLogoFrame(a, offsetX);
         push();
         Mixtape.drawTracklist(a, 255);
         pop();
@@ -438,13 +501,12 @@ function triggerMixtape(app) {
       onAligned: () => {
         app.setState(Hold, {
           drawOverride: a => {
-            drawLogoFrame(a, width / 4);
+            drawLogoFrame(a, offsetX);
             push();
             Mixtape.drawTracklist(a, 255);
             pop();
           },
           onHeld: () => {
-            const offsetX = width / 4;
             const source = frontalCells(app, app.model, offsetX);
             const target = frontalCells(app, CopyrightModel, 0);
             app.setState(Morph, {
@@ -459,16 +521,46 @@ function triggerMixtape(app) {
               onDone: a => {
                 a.showingMixtape = false;
                 a.model = CopyrightModel;
-                if (link) link.classList.remove('active');
+                setActiveLink(null);
               }
             });
           }
         });
       }
     });
+
+  } else if (app.state === ShowManifesto) {
+    // --- Manifesto → Mixtape (crossfade fluido) ---
+    const { cellW: mCW, cellH: mCH } = Manifesto.cellSize(app.cellW);
+    const offsetX = width / 4;
+    const targetModel = Mixtape.isPlaying ? PauseModel : PlayModel;
+
+    // Morph diretto: celle manifesto → logo in posizione mixtape
+    const source = ShowManifesto.getCells();
+    const target = frontalCells(app, targetModel, offsetX);
+    app.setState(Morph, {
+      source,
+      targets: target,
+      sourceCellW: ShowManifesto.getCellW(),
+      sourceCellH: ShowManifesto.getCellH(),
+      next: ShowMixtape,
+      drawOverlay: (a, u) => {
+        push();
+        Mixtape.drawTracklist(a, u * 255);
+        pop();
+      },
+      onDone: a => {
+        a.showingManifesto = false;
+        a.showingMixtape = true;
+        a.model = targetModel;
+        setActiveLink('mixtape-link');
+        a.angle = 0;
+      },
+    });
+
   } else if (app.state === IdleSpin) {
-    if (link) link.classList.add('active');
-    
+    // --- Home → Mixtape ---
+    setActiveLink('mixtape-link');
     app.setState(Align, {
       onAligned: () => {
         app.setState(Hold, {
@@ -495,6 +587,7 @@ function triggerMixtape(app) {
       }
     });
   }
+  // Se siamo in Align/Hold/Morph (transizione in corso) → ignora
 }
 
 // Align/Scrub sono usati anche da main.js (click home, scroll).

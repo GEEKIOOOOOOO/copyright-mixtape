@@ -22,7 +22,7 @@ const Manifesto = {
   // (o comunque prima di getCells). Usa fetch asincrono + callback
   // p5-friendly.
   preload() {
-    fetch('assets/manifesto.txt')
+    fetch(import.meta.env.BASE_URL + 'assets/manifesto.txt')
       .then(r => r.text())
       .then(t => { this._text = t.trim(); this._ready = true; });
   },

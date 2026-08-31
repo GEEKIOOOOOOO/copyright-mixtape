@@ -1,22 +1,16 @@
-// =============================================================
-//  Mixtape — gestisce la logica musicale e la generazione
-//  delle celle ASCII per la UI del player.
-// =============================================================
+import { MANIFESTO_FONT_SIZE, FONT_SIZE, TRACKS } from './config.js';
 
-import { MANIFESTO_FONT_SIZE, FONT_SIZE } from './config.js';
+// Prefissa ogni percorso audio con il base path di Vite (in dev è "/",
+// in build per GitHub Pages è "/copyright-mixtape/"). Così gli URL
+// funzionano sia in locale che su Pages senza dover cambiare nulla.
+const resolvedTracks = TRACKS.map(t => ({
+  title: t.title,
+  file:  import.meta.env.BASE_URL + t.file,
+}));
 
-// Usa Vite per leggere automaticamente tutti i file .mp3 nella cartella
-const audioFiles = import.meta.glob('/public/assets/wetransfer_bozze_2026-07-03_0039/BOZZE/*.mp3');
-const generatedTracks = Object.keys(audioFiles).map(path => {
-  const fileName = path.split('/').pop();
-  const title = fileName.replace(/\.mp3$/i, '');
-  // Rimuovi '/public/' dal percorso per ottenere l'URL corretto per il browser
-  const file = path.replace('/public/', '');
-  return { title, file };
-});
 
 const Mixtape = {
-  tracks: generatedTracks,
+  tracks: resolvedTracks,
   activeTrackIndex: 0,
   audio: null,
   isPlaying: false,

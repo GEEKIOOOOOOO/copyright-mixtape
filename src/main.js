@@ -124,14 +124,12 @@ function windowResized() {
   refreshGrid();
 }
 
-// Click ovunque sul canvas: se il manifesto è visibile, torna alla home.
+// Click sul canvas: delega allo stato corrente se ha un onClick
+// (es. ShowMixtape per tracce/play). NON chiude mai manifesto/mixtape
+// con click casuale — la navigazione tra pagine è solo via header.
 function mousePressed() {
-  if (App.showingManifesto) {
-    triggerManifesto(App);
-  } else if (App.showingMixtape) {
-    if (App.state && App.state.onClick) {
-      App.state.onClick(App, mouseX, mouseY);
-    }
+  if (App.state && App.state.onClick) {
+    App.state.onClick(App, mouseX, mouseY);
   }
 }
 
