@@ -7,7 +7,7 @@
 
 import {
   LIGHT_KEY, LIGHT_FILL, LIGHT_AMB, DIFFUSE, SPECULAR, SHININESS,
-  COPYRIGHT_MODEL, MODEL_SIZE,
+  COPYRIGHT_MODEL, getModelSize,
 } from './config.js';
 
 // Luci bilanciate per ottenere un gradiente che copra tutta la rampa:
@@ -41,8 +41,8 @@ const CopyrightModel = {
     // IMPORTANTE: un buffer WEBGL non azzera la matrice tra un frame e l'altro,
     // quindi le rotazioni si accumulano. push()/pop() la riportano pulita ogni frame.
     pg.push();
-    // Normalizza il diametro esterno (anello + tubo) a MODEL_SIZE.
-    pg.scale(MODEL_SIZE / (2 * (RING_R + RING_TUBE)));
+    // Normalizza il diametro esterno (anello + tubo) a getModelSize() (dinamico per responsive).
+    pg.scale(getModelSize() / (2 * (RING_R + RING_TUBE)));
     pg.rotateY(angle);
 
     // Anello esterno
@@ -57,7 +57,7 @@ const CopyrightModel = {
 
   // Raggio cliccabile attorno al centro dello schermo (con un piccolo margine).
   hitRadius() {
-    return (MODEL_SIZE / 2) * 1.15;
+    return (getModelSize() / 2) * 1.15;
   },
 };
 

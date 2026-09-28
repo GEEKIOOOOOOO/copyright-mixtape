@@ -9,7 +9,7 @@
 // =============================================================
 
 import {
-  FONT_SIZE, MANIFESTO_FONT_SIZE,
+  FONT_SIZE, getManifestoFontSize,
   ASCII_DEFAULT, BG_COLOR, CHAR_COLOR, SPIN_SPEED, ANIM,
   SNAP_DELAY_MS, SCRUB_FOLLOW, SETTLE_EPS, SCREEN_DWELL_MS,
   easeInOutCubic, damp,
@@ -253,27 +253,55 @@ const Scrub = {
 // --- Manifesto: il testo del manifesto fermo al centro, reso come griglia ---
 // di caratteri ASCII a MANIFESTO_FONT_SIZE. La navigazione avviene solo
 // tramite i link nell'header (manifesto), mai click casuale.
+// Su mobile, supporta lo scroll verticale (touch/wheel).
 const ShowManifesto = {
-  _cells: null,   // celle del manifesto (cache, invalidata su resize)
+  _cells: null,   // celle del manifesto (cache, invalidata su resize/scroll)
   _w: 0,          // dimensioni canvas al momento del calcolo (per invalidare)
   _h: 0,
   _mCellW: 0,     // dimensioni cella manifesto (per il draw e il morph inverso)
   _mCellH: 0,
+  _scrollOffset: 0,     // offset di scroll in righe
+  _maxScroll: 0,        // massimo offset di scroll (totalTextRows - usableRows)
+  _totalTextRows: 0,    // righe totali del testo formattato
+  _touchStartY: null,   // posizione Y iniziale del touch (per lo swipe)
+  _scrollVelocity: 0,   // velocità di scroll inerziale
+  _lastTouchY: null,    // ultima posizione Y del touch
+  _lastTouchTime: 0,    // ultimo timestamp del touch
 
   enter(app) {
     app.showingManifesto = true;
     this._cells = null;   // forza ricalcolo
+    this._scrollOffset = 0;
+    this._maxScroll = 0;
+    this._scrollVelocity = 0;
+    this._touchStartY = null;
   },
 
-  update(app) {
-    // Ricalcola le celle se il canvas è cambiato (resize)
+  update(app, dt) {
+    // Inerzia dello scroll (decelerazione)
+    if (Math.abs(this._scrollVelocity) > 0.01) {
+      this._scrollOffset += this._scrollVelocity * dt;
+      this._scrollVelocity *= 0.92;   // attrito
+      this._scrollOffset = Math.max(0, Math.min(this._scrollOffset, this._maxScroll));
+      this._cells = null;   // forza ricalcolo
+    } else {
+      this._scrollVelocity = 0;
+    }
+
+    // Ricalcola le celle se il canvas è cambiato (resize) o se lo scroll è cambiato
     if (!this._cells || this._w !== width || this._h !== height) {
       this._w = width;
       this._h = height;
       const { cellW, cellH } = Manifesto.cellSize(app.cellW);
       this._mCellW = cellW;
       this._mCellH = cellH;
-      this._cells = Manifesto.getCells(width, height, cellW, cellH);
+      const result = Manifesto.getCells(width, height, cellW, cellH, Math.round(this._scrollOffset));
+      this._cells = result.cells;
+      this._totalTextRows = result.totalTextRows;
+      // Calcola il massimo scroll: righe che non entrano nello schermo
+      const rows = Math.floor(height / cellH);
+      const usableRows = rows - 6;   // MARGIN_ROWS * 2
+      this._maxScroll = Math.max(0, this._totalTextRows - usableRows);
     }
   },
 
@@ -281,10 +309,56 @@ const ShowManifesto = {
     background(BG_COLOR);
     fill(CHAR_COLOR);
     noStroke();
-    textSize(MANIFESTO_FONT_SIZE);
+    textSize(getManifestoFontSize());
     for (const cell of this._cells || []) {
       text(cell.char, cell.col * this._mCellW, cell.row * this._mCellH);
     }
+  },
+
+  // Gestisce lo scroll via rotella del mouse
+  onWheel(deltaY) {
+    if (this._maxScroll <= 0) return;   // non serve scroll su desktop
+    const scrollAmount = deltaY > 0 ? 2 : -2;   // righe per "notch"
+    this._scrollOffset = Math.max(0, Math.min(
+      this._scrollOffset + scrollAmount, this._maxScroll
+    ));
+    this._cells = null;   // forza ricalcolo
+  },
+
+  // Gestisce l'inizio del touch (swipe)
+  onTouchStart(y) {
+    this._touchStartY = y;
+    this._lastTouchY = y;
+    this._lastTouchTime = performance.now();
+    this._scrollVelocity = 0;   // ferma l'inerzia
+  },
+
+  // Gestisce il movimento del touch (swipe)
+  onTouchMove(y) {
+    if (this._touchStartY === null || this._maxScroll <= 0) return;
+    const deltaY = this._lastTouchY - y;   // pixel di spostamento
+    const deltaRows = deltaY / this._mCellH;   // converti in righe
+    this._scrollOffset = Math.max(0, Math.min(
+      this._scrollOffset + deltaRows, this._maxScroll
+    ));
+
+    // Calcola velocità per inerzia
+    const now = performance.now();
+    const dt = (now - this._lastTouchTime) / 1000;
+    if (dt > 0) {
+      this._scrollVelocity = deltaRows / dt * 0.3;   // attenuata
+    }
+
+    this._lastTouchY = y;
+    this._lastTouchTime = now;
+    this._cells = null;   // forza ricalcolo
+  },
+
+  // Gestisce la fine del touch
+  onTouchEnd() {
+    this._touchStartY = null;
+    this._lastTouchY = null;
+    // L'inerzia continua in update()
   },
 
   // Celle correnti e dimensioni per il morph inverso (manifesto → ©)
@@ -343,7 +417,7 @@ function triggerManifesto(app) {
         app.setState(Hold, {
           onHeld: () => {
             const source = frontalCells(app, app.model);
-            const target = Manifesto.getCells(width, height, mCW, mCH);
+            const target = Manifesto.getCells(width, height, mCW, mCH).cells;
             app.setState(Morph, {
               source,
               targets: target,

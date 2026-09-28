@@ -8,11 +8,18 @@
 //  Usa MANIFESTO_FONT_SIZE (indipendente dal FONT_SIZE del logo).
 // =============================================================
 
-import { FONT_SIZE, MANIFESTO_FONT_SIZE } from './config.js';
+import { FONT_SIZE, getManifestoFontSize } from './config.js';
 
-const MARGIN_COLS = 4;   // margine laterale in celle (per lato)
+const MARGIN_COLS_DESKTOP = 4;   // margine laterale in celle su desktop (per lato)
+const MARGIN_COLS_MOBILE  = 2;   // margine laterale in celle su mobile (per lato)
 const MARGIN_ROWS = 3;   // margine verticale in celle (per lato)
 const PARA_GAP    = 1;   // righe vuote tra paragrafi
+
+// Restituisce il margine colonne appropriato per la dimensione dello schermo
+function getMarginCols() {
+  if (typeof windowWidth === 'undefined') return MARGIN_COLS_DESKTOP;
+  return windowWidth >= 800 ? MARGIN_COLS_DESKTOP : MARGIN_COLS_MOBILE;
+}
 
 const Manifesto = {
   _text: '',       // testo grezzo caricato
@@ -30,25 +37,29 @@ const Manifesto = {
   // Dimensioni di cella per il manifesto, derivate dal font monospace.
   // baseCellW è il cellW del logo (a FONT_SIZE): scaliamo linearmente.
   cellSize(baseCellW) {
-    const scale = MANIFESTO_FONT_SIZE / FONT_SIZE;
+    const mfs = getManifestoFontSize();
+    const scale = mfs / FONT_SIZE;
     return {
       cellW: baseCellW * scale,
-      cellH: MANIFESTO_FONT_SIZE,
+      cellH: mfs,
     };
   },
 
   // Genera le celle del manifesto adattate alle dimensioni del canvas.
-  // Usa la propria griglia basata su MANIFESTO_FONT_SIZE.
-  // Restituisce un array di {col, row, char} (solo caratteri non-spazio),
-  // stesso formato di Ascii.gridToCells().
-  getCells(canvasW, canvasH, cellW, cellH) {
-    if (!this._ready) return [];
+  // Usa la propria griglia basata su getManifestoFontSize().
+  // scrollOffset: offset di scroll in righe (default 0).
+  // Restituisce un oggetto { cells, totalTextRows } dove cells è un array
+  // di {col, row, char} (solo caratteri non-spazio) e totalTextRows è il
+  // numero totale di righe del testo formattato (per calcolare lo scroll).
+  getCells(canvasW, canvasH, cellW, cellH, scrollOffset) {
+    if (!this._ready) return { cells: [], totalTextRows: 0 };
 
+    const marginCols = getMarginCols();
     const cols = Math.floor(canvasW / cellW);
     const rows = Math.floor(canvasH / cellH);
-    const usableCols = cols - MARGIN_COLS * 2;
+    const usableCols = cols - marginCols * 2;
     const usableRows = rows - MARGIN_ROWS * 2;
-    if (usableCols < 10 || usableRows < 4) return [];
+    if (usableCols < 10 || usableRows < 4) return { cells: [], totalTextRows: 0 };
 
     // Splitta in paragrafi (righe vuote), poi word-wrap ogni paragrafo.
     const paragraphs = this._text.split(/\n\s*\n/);
@@ -79,26 +90,37 @@ const Manifesto = {
       if (line) wrappedLines.push(line);
     }
 
-    // Tronca se supera le righe disponibili
-    const lines = wrappedLines.slice(0, usableRows);
+    const totalTextRows = wrappedLines.length;
 
-    // Centra verticalmente
-    const startRow = MARGIN_ROWS + Math.floor((usableRows - lines.length) / 2);
+    // Se il testo entra nello spazio, centra verticalmente (come prima).
+    // Se non entra, applica scrollOffset per permettere lo scroll.
+    const sOff = scrollOffset || 0;
+    let startRow;
+    if (totalTextRows <= usableRows) {
+      // Il testo entra: centra verticalmente (comportamento desktop invariato)
+      startRow = MARGIN_ROWS + Math.floor((usableRows - totalTextRows) / 2);
+    } else {
+      // Il testo non entra: parte dall'alto con offset di scroll
+      startRow = MARGIN_ROWS - sOff;
+    }
 
-    // Genera le celle (solo caratteri non-spazio)
+    // Genera le celle (solo caratteri non-spazio, solo righe visibili)
     const cells = [];
-    for (let r = 0; r < lines.length; r++) {
-      const line = lines[r];
-      const startCol = MARGIN_COLS;
+    for (let r = 0; r < wrappedLines.length; r++) {
+      const screenRow = startRow + r;
+      // Salta righe fuori schermo per performance
+      if (screenRow < -1 || screenRow > rows + 1) continue;
+      const line = wrappedLines[r];
+      const startCol = marginCols;
       for (let c = 0; c < line.length; c++) {
         const ch = line[c];
         if (ch !== ' ') {
-          cells.push({ col: startCol + c, row: startRow + r, char: ch });
+          cells.push({ col: startCol + c, row: screenRow, char: ch });
         }
       }
     }
 
-    return cells;
+    return { cells, totalTextRows };
   },
 };
 

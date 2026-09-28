@@ -4,7 +4,14 @@
 
 // --- Aspetto ASCII ---
 const FONT_SIZE   = 9;                   // dimensione carattere ASCII 3D: più piccolo = più dettaglio
-const MANIFESTO_FONT_SIZE = 20;          // dimensione carattere del manifesto (indipendente dal logo)
+const MANIFESTO_FONT_SIZE_DESKTOP = 20;  // dimensione carattere del manifesto su desktop
+// Su desktop (≥800px) restituisce 20 (invariato). Su mobile riduce per leggibilità.
+function getManifestoFontSize() {
+  if (typeof windowWidth === 'undefined') return MANIFESTO_FONT_SIZE_DESKTOP;
+  if (windowWidth >= 800) return MANIFESTO_FONT_SIZE_DESKTOP;
+  // Scala lineare: 14px a 360px, 18px a 600px
+  return Math.round(14 + (windowWidth - 360) / (600 - 360) * 4);
+}
 const CHAR_COLOR  = '#1a1a1a';          // colore dei caratteri (nero su bianco)
 const BG_COLOR    = 255;                 // sfondo bianco
 const SPIN_SPEED  = 0.4;                 // velocità di rotazione in radianti AL SECONDO (costante, indipendente dagli fps)
@@ -57,7 +64,14 @@ const MODEL_CYCLE = ['copyright'];
 // Dimensione a schermo dell'elemento centrale, UGUALE per tutti i modelli:
 // è il lato più lungo del bounding box frontale visibile, bordi inclusi.
 // Ogni modello si normalizza da solo a questa misura.
-const MODEL_SIZE = 640;
+// Su desktop (≥800px) restituisce sempre 640 (invariato).
+// Su mobile scala proporzionalmente al lato più corto dello schermo.
+const MODEL_SIZE_DESKTOP = 640;
+function getModelSize() {
+  if (typeof windowWidth === 'undefined') return MODEL_SIZE_DESKTOP;
+  if (windowWidth >= 800) return MODEL_SIZE_DESKTOP;
+  return Math.min(windowWidth, windowHeight) * 0.72;
+}
 
 // Modello 'copyright': proporzioni del simbolo (la scala finale la dà MODEL_SIZE)
 const COPYRIGHT_MODEL = {
@@ -116,11 +130,11 @@ function damp(current, target, rate, dt) {
 // TWO_PI, …) restano globali e NON vanno importate: qui esportiamo solo la
 // configurazione e gli helper propri del progetto.
 export {
-  FONT_SIZE, MANIFESTO_FONT_SIZE, CHAR_COLOR, BG_COLOR, SPIN_SPEED,
+  FONT_SIZE, getManifestoFontSize, CHAR_COLOR, BG_COLOR, SPIN_SPEED,
   RAMP, BLACK_LEVEL, WHITE_LEVEL, GAMMA,
   EDGE_THRESHOLD, EDGE_MIN_LUM, EDGE_BG_MAX, ASCII_DEFAULT,
   LIGHT_KEY, LIGHT_FILL, LIGHT_AMB, DIFFUSE, SPECULAR, SHININESS,
-  MODEL_CYCLE, MODEL_SIZE, COPYRIGHT_MODEL,
+  MODEL_CYCLE, getModelSize, COPYRIGHT_MODEL,
   SCROLL_SENSITIVITY, SCRUB_FOLLOW, SNAP_DELAY_MS, SCREEN_DWELL_MS, SETTLE_EPS,
   ANIM, easeInOutCubic, damp,
 };

@@ -15,7 +15,7 @@
 
 import { FONT_SIZE, MODEL_CYCLE } from './config.js';
 import { CopyrightModel } from './model.js';
-import { IdleSpin, triggerManifesto } from './states.js';
+import { IdleSpin, triggerManifesto, ShowManifesto } from './states.js';
 import { Manifesto } from './manifesto.js';
 
 const App = {
@@ -124,9 +124,32 @@ function touchStarted(event) {
   if (event && event.target && event.target.tagName !== 'CANVAS') {
     return;
   }
+  if (App.state === ShowManifesto) {
+    ShowManifesto.onTouchStart(mouseY);
+  }
   mousePressed();
   // Previene lo scrolling/zooming accidentale sul canvas da mobile
   return false;
+}
+
+function touchMoved(event) {
+  if (App.state === ShowManifesto) {
+    ShowManifesto.onTouchMove(mouseY);
+    return false; // prevent default scrolling
+  }
+}
+
+function touchEnded(event) {
+  if (App.state === ShowManifesto) {
+    ShowManifesto.onTouchEnd();
+  }
+}
+
+function mouseWheel(event) {
+  if (App.state === ShowManifesto) {
+    ShowManifesto.onWheel(event.deltaY);
+    return false; // prevent default scroll
+  }
 }
 
 // --- Aggancio del ciclo di vita p5 (global mode) ---
@@ -144,3 +167,6 @@ window.draw          = draw;
 window.windowResized = windowResized;
 window.mousePressed  = mousePressed;
 window.touchStarted  = touchStarted;
+window.touchMoved    = touchMoved;
+window.touchEnded    = touchEnded;
+window.mouseWheel    = mouseWheel;

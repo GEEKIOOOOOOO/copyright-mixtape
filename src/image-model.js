@@ -9,7 +9,7 @@
 //  quanto un model() qualsiasi.
 // =============================================================
 
-import { MODEL_SIZE, DIFFUSE } from './config.js';
+import { getModelSize, DIFFUSE } from './config.js';
 import { applyStudioLights } from './model.js';
 
 // Core condiviso: `buildSilhouette()` -> grid ritagliata {cols,rows,solid},
@@ -21,7 +21,7 @@ function createExtrudedModel({ buildSilhouette, scale = 1, depth, wallShade }) {
   return {
     init(pg) {
       const grid = buildSilhouette();
-      const cell = MODEL_SIZE * scale / max(grid.cols, grid.rows);
+      const cell = getModelSize() * scale / max(grid.cols, grid.rows);
       geom = pg.buildGeometry(() => emitExtrusion(pg, grid, cell, depth, wallShade));
       radius = 0.5 * cell * sqrt(grid.cols * grid.cols + grid.rows * grid.rows);
     },
