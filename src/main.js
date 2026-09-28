@@ -15,9 +15,8 @@
 
 import { FONT_SIZE, MODEL_CYCLE } from './config.js';
 import { CopyrightModel } from './model.js';
-import { IdleSpin, triggerManifesto, triggerMixtape, ShowMixtape } from './states.js';
+import { IdleSpin, triggerManifesto } from './states.js';
 import { Manifesto } from './manifesto.js';
-import { Mixtape } from './mixtape.js';
 
 const App = {
   state: null,
@@ -39,7 +38,6 @@ const App = {
   dwellUntil: 0,         // fino a quando lo scroll resta assorbito dopo un aggancio (detent)
 
   showingManifesto: false,  // true quando il manifesto è visibile
-  showingMixtape: false,    // true quando il mixtape è visibile
 
   setState(state, opts) {
     this.state = state;
@@ -63,7 +61,6 @@ function preload() {
 
   for (const m of App.models) if (m.preload) m.preload();
   Manifesto.preload();
-  Mixtape.preload();
 }
 
 function setup() {
@@ -86,15 +83,6 @@ function setup() {
     manifestoLink.addEventListener('click', e => {
       e.preventDefault();
       triggerManifesto(App);
-    });
-  }
-
-  // Link "mixtape" nell'header
-  const mixtapeLink = document.getElementById('mixtape-link');
-  if (mixtapeLink) {
-    mixtapeLink.addEventListener('click', e => {
-      e.preventDefault();
-      triggerMixtape(App);
     });
   }
 }
@@ -124,9 +112,7 @@ function windowResized() {
   refreshGrid();
 }
 
-// Click sul canvas: delega allo stato corrente se ha un onClick
-// (es. ShowMixtape per tracce/play). NON chiude mai manifesto/mixtape
-// con click casuale — la navigazione tra pagine è solo via header.
+// Click sul canvas: delega allo stato corrente se ha un onClick.
 function mousePressed() {
   if (App.state && App.state.onClick) {
     App.state.onClick(App, mouseX, mouseY);

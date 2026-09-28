@@ -17,8 +17,7 @@ import {
 import { Ascii } from './ascii.js';
 import { Particles } from './particles.js';
 import { Manifesto } from './manifesto.js';
-import { Mixtape } from './mixtape.js';
-import { CopyrightModel, PlayModel, PauseModel } from './model.js';
+import { CopyrightModel } from './model.js';
 
 function renderLogoFrame(app, offsetX = 0) {
   if (offsetX !== 0) {
@@ -79,8 +78,7 @@ function frontalCells(app, model, offsetX = 0) {
 }
 
 function overLogo(app, x, y) {
-  let cx = width / 2;
-  if (app.state === ShowMixtape) cx += width / 4;
+  const cx = width / 2;
   return dist(x, y, cx, height / 2) <= app.model.hitRadius();
 }
 
@@ -254,7 +252,7 @@ const Scrub = {
 
 // --- Manifesto: il testo del manifesto fermo al centro, reso come griglia ---
 // di caratteri ASCII a MANIFESTO_FONT_SIZE. La navigazione avviene solo
-// tramite i link nell'header (manifesto/mixtape), mai click casuale.
+// tramite i link nell'header (manifesto), mai click casuale.
 const ShowManifesto = {
   _cells: null,   // celle del manifesto (cache, invalidata su resize)
   _w: 0,          // dimensioni canvas al momento del calcolo (per invalidare)
@@ -295,85 +293,11 @@ const ShowManifesto = {
   getCellH()  { return this._mCellH; },
 };
 
-// --- Mixtape: la playlist e il player ASCII ---
-const ShowMixtape = {
-  enter(app) {
-    app.showingMixtape = true;
-    app.model = Mixtape.isPlaying ? PauseModel : PlayModel;
-    
-    // Inverti il tasto quando la canzone finisce
-    Mixtape.onEnd(() => {
-      const offsetX = width / 4;
-      const source = frontalCells(app, app.model, offsetX);
-      const target = frontalCells(app, PlayModel, offsetX);
-      app.setState(Morph, {
-        source,
-        targets: target,
-        next: ShowMixtape,
-        onDone: a => { a.model = PlayModel; }
-      });
-    });
-  },
-
-  update(app, dt) {
-    app.angle += SPIN_SPEED * dt;
-  },
-
-  draw(app) {
-    drawLogoFrame(app, width / 4);
-    
-    Mixtape.drawTracklist(app, 255);
-  },
-
-  onClick(app, x, y) {
-    const hitTrack = Mixtape.hitTest(x, y);
-    const offsetX = width / 4;
-    
-    if (hitTrack && hitTrack.type === 'track') {
-      Mixtape.setTrack(hitTrack.index);
-      if (app.model === PlayModel) {
-        const source = cellsAtAngle(app, app.model, app.angle, offsetX);
-        const target = cellsAtAngle(app, PauseModel, app.angle, offsetX);
-        app.setState(Morph, {
-          source, targets: target, next: ShowMixtape,
-          drawOverlay: a => Mixtape.drawTracklist(a, 255),
-          onDone: a => { a.model = PauseModel; }
-        });
-      }
-    } else if (hitTrack && hitTrack.type === 'progress') {
-      Mixtape.seek(hitTrack.frac);
-    } else if (overLogo(app, x, y)) {
-      if (Mixtape.isPlaying) {
-        Mixtape.pause();
-        const source = cellsAtAngle(app, app.model, app.angle, offsetX);
-        const target = cellsAtAngle(app, PlayModel, app.angle, offsetX);
-        app.setState(Morph, {
-          source, targets: target, next: ShowMixtape,
-          drawOverlay: a => Mixtape.drawTracklist(a, 255),
-          onDone: a => { a.model = PlayModel; }
-        });
-      } else {
-        Mixtape.play();
-        const source = cellsAtAngle(app, app.model, app.angle, offsetX);
-        const target = cellsAtAngle(app, PauseModel, app.angle, offsetX);
-        app.setState(Morph, {
-          source, targets: target, next: ShowMixtape,
-          drawOverlay: a => Mixtape.drawTracklist(a, 255),
-          onDone: a => { a.model = PauseModel; }
-        });
-      }
-    }
-    // Click fuori da tracce/logo: nessuna azione (non torna alla home)
-  }
-};
-
 // =============================================================
-//  Navigazione universale: triggerManifesto / triggerMixtape
+//  Navigazione: triggerManifesto
 //
-//  Gestiscono le transizioni fluide tra TUTTE le combinazioni:
+//  Gestisce le transizioni fluide:
 //    IdleSpin  ↔  ShowManifesto
-//    IdleSpin  ↔  ShowMixtape
-//    ShowMixtape  →  ShowManifesto  (e viceversa)
 //
 //  Ogni transizione usa la pipeline  Align → Hold → Morph,
 //  con le dimensioni di cella appropriate interpolate dal Morph.
@@ -381,16 +305,14 @@ const ShowMixtape = {
 //  viene ignorato per evitare glitch.
 // =============================================================
 
-// Aggiorna le classi 'active' sui link dell'header
+// Aggiorna la classe 'active' sul link dell'header
 function setActiveLink(activeId) {
   const mLink = document.getElementById('manifesto-link');
-  const xLink = document.getElementById('mixtape-link');
   if (mLink) mLink.classList.toggle('active', activeId === 'manifesto-link');
-  if (xLink) xLink.classList.toggle('active', activeId === 'mixtape-link');
 }
 
 // --- triggerManifesto ---
-// Gestisce: ShowManifesto→Home, IdleSpin→ShowManifesto, ShowMixtape→ShowManifesto
+// Gestisce: ShowManifesto→Home, IdleSpin→ShowManifesto
 function triggerManifesto(app) {
   const { cellW: mCW, cellH: mCH } = Manifesto.cellSize(app.cellW);
 
@@ -409,52 +331,6 @@ function triggerManifesto(app) {
         a.model = CopyrightModel;
         setActiveLink(null);
         a.angle = 0;
-      },
-    });
-
-  } else if (app.state === ShowMixtape) {
-    // --- Mixtape → Manifesto (crossfade fluido) ---
-    if (!Manifesto._ready) return;
-    const offsetX = width / 4;
-    app.setState(Align, {
-      drawOverride: a => {
-        drawLogoFrame(a, offsetX);
-        push();
-        Mixtape.drawTracklist(a, 255);
-        pop();
-      },
-      onAligned: () => {
-        app.setState(Hold, {
-          drawOverride: a => {
-            drawLogoFrame(a, offsetX);
-            push();
-            Mixtape.drawTracklist(a, 255);
-            pop();
-          },
-          onHeld: () => {
-            // Morph: logo da posizione mixtape (offset) verso celle manifesto
-            const source = frontalCells(app, app.model, offsetX);
-            const target = Manifesto.getCells(width, height, mCW, mCH);
-            app.setState(Morph, {
-              source,
-              targets: target,
-              targetCellW: mCW,
-              targetCellH: mCH,
-              next: ShowManifesto,
-              drawOverlay: (a, u) => {
-                push();
-                Mixtape.drawTracklist(a, (1 - u) * 255);
-                pop();
-              },
-              onDone: a => {
-                a.showingMixtape = false;
-                a.showingManifesto = true;
-                a.model = CopyrightModel;
-                setActiveLink('manifesto-link');
-              },
-            });
-          },
-        });
       },
     });
 
@@ -484,113 +360,5 @@ function triggerManifesto(app) {
   // Se siamo in Align/Hold/Morph (transizione in corso) → ignora
 }
 
-// --- triggerMixtape ---
-// Gestisce: ShowMixtape→Home, IdleSpin→ShowMixtape, ShowManifesto→ShowMixtape
-function triggerMixtape(app) {
-
-  if (app.state === ShowMixtape) {
-    // --- Mixtape → Home ---
-    const offsetX = width / 4;
-    app.setState(Align, {
-      drawOverride: a => {
-        drawLogoFrame(a, offsetX);
-        push();
-        Mixtape.drawTracklist(a, 255);
-        pop();
-      },
-      onAligned: () => {
-        app.setState(Hold, {
-          drawOverride: a => {
-            drawLogoFrame(a, offsetX);
-            push();
-            Mixtape.drawTracklist(a, 255);
-            pop();
-          },
-          onHeld: () => {
-            const source = frontalCells(app, app.model, offsetX);
-            const target = frontalCells(app, CopyrightModel, 0);
-            app.setState(Morph, {
-              source,
-              targets: target,
-              next: IdleSpin,
-              drawOverlay: (a, u) => {
-                push();
-                Mixtape.drawTracklist(a, (1 - u) * 255);
-                pop();
-              },
-              onDone: a => {
-                a.showingMixtape = false;
-                a.model = CopyrightModel;
-                setActiveLink(null);
-              }
-            });
-          }
-        });
-      }
-    });
-
-  } else if (app.state === ShowManifesto) {
-    // --- Manifesto → Mixtape (crossfade fluido) ---
-    const { cellW: mCW, cellH: mCH } = Manifesto.cellSize(app.cellW);
-    const offsetX = width / 4;
-    const targetModel = Mixtape.isPlaying ? PauseModel : PlayModel;
-
-    // Morph diretto: celle manifesto → logo in posizione mixtape
-    const source = ShowManifesto.getCells();
-    const target = frontalCells(app, targetModel, offsetX);
-    app.setState(Morph, {
-      source,
-      targets: target,
-      sourceCellW: ShowManifesto.getCellW(),
-      sourceCellH: ShowManifesto.getCellH(),
-      next: ShowMixtape,
-      drawOverlay: (a, u) => {
-        push();
-        Mixtape.drawTracklist(a, u * 255);
-        pop();
-      },
-      onDone: a => {
-        a.showingManifesto = false;
-        a.showingMixtape = true;
-        a.model = targetModel;
-        setActiveLink('mixtape-link');
-        a.angle = 0;
-      },
-    });
-
-  } else if (app.state === IdleSpin) {
-    // --- Home → Mixtape ---
-    setActiveLink('mixtape-link');
-    app.setState(Align, {
-      onAligned: () => {
-        app.setState(Hold, {
-          onHeld: () => {
-            const offsetX = width / 4;
-            const source = frontalCells(app, app.model, 0);
-            const targetModel = Mixtape.isPlaying ? PauseModel : PlayModel;
-            const target = frontalCells(app, targetModel, offsetX);
-            app.setState(Morph, {
-              source,
-              targets: target,
-              next: ShowMixtape,
-              drawOverlay: (a, u) => {
-                push();
-                Mixtape.drawTracklist(a, u * 255);
-                pop();
-              },
-              onDone: a => {
-                a.model = targetModel;
-              }
-            });
-          }
-        });
-      }
-    });
-  }
-  // Se siamo in Align/Hold/Morph (transizione in corso) → ignora
-}
-
 // Align/Scrub sono usati anche da main.js (click home, scroll).
-export { IdleSpin, Align, Hold, Morph, Scrub, ShowManifesto, triggerManifesto, ShowMixtape, triggerMixtape };
-
-
+export { IdleSpin, Align, Hold, Morph, Scrub, ShowManifesto, triggerManifesto };

@@ -111,26 +111,6 @@ function damp(current, target, rate, dt) {
   return lerp(current, target, 1 - Math.exp(-rate * dt));
 }
 
-// --- Tracklist del mixtape ---
-// Ogni traccia ha un titolo (mostrato nel player) e il percorso del file
-// relativo alla root pubblica. I file vivono in public/assets/audio/ e Vite
-// li copia in dist/assets/audio/ al build.
-const TRACKS = [
-  { title: '3b3 - INTRO',                                             file: 'assets/audio/3b3 - INTRO.mp3' },
-  { title: 'INTRO DIRITTI D\'AUTORE (Kodak Black - Skrilla)',         file: 'assets/audio/INTRO DIRITTI D\'AUTORE (Kodak Black - Skrilla).mp3' },
-  { title: 'BASS LOVE (prod. Kerosene)',                              file: 'assets/audio/BASS LOVE (prod. Kerosene).mp3' },
-  { title: 'hogan acustic',                                           file: 'assets/audio/hogan acustic.mp3' },
-  { title: 'ILLEGAO',                                                 file: 'assets/audio/ILLEGAO.mp3' },
-  { title: 'OVERDOSING (Calcutta-Paracetamolo)',                      file: 'assets/audio/OVERDOSING (Calcutta-Paracetamolo).mp3' },
-  { title: 'COUS COUS ( Rami Music - تقطيع ربابة )',                  file: 'assets/audio/COUS COUS ( Rami Music - تقطيع ربابة ).mp3' },
-  { title: 'bound 222',                                               file: 'assets/audio/bound 222.mp3' },
-  { title: '777TRIBUTE (Dark Polo Gang - Pesi Sul Collo RMX)',        file: 'assets/audio/777TRIBUTE (Dark Polo Gang - Pesi Sul Collo RMX).mp3' },
-  { title: 'BALLANDO BALLANDOLO',                                     file: 'assets/audio/BALLANDO BALLANDOLO.mp3' },
-  { title: 'SKIT JUST GEEK!',                                         file: 'assets/audio/SKIT JUST GEEK!.mp3' },
-  { title: 'W.G.M (Kesha - Tik Tok rmx)',                             file: 'assets/audio/W.G.M (Kesha - Tik Tok rmx).mp3' },
-  { title: 'L\'america è donna e si è fatta troia (O\'lEan-Leaving)', file: 'assets/audio/L\'america è donna e si è fatta troia (O\'lEan-Leaving).mp3' },
-];
-
 // --- Superficie pubblica del modulo (ES Modules) ---
 // Nota: p5 resta in "global mode", quindi le sue funzioni/costanti (pow, lerp,
 // TWO_PI, …) restano globali e NON vanno importate: qui esportiamo solo la
@@ -143,5 +123,4 @@ export {
   MODEL_CYCLE, MODEL_SIZE, COPYRIGHT_MODEL,
   SCROLL_SENSITIVITY, SCRUB_FOLLOW, SNAP_DELAY_MS, SCREEN_DWELL_MS, SETTLE_EPS,
   ANIM, easeInOutCubic, damp,
-  TRACKS,
 };
